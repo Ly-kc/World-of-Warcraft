@@ -9,57 +9,65 @@ string co[2] = { "red" , "blue" };
 int order[2][5] = {
 2,3,4,1,0,
 3,0,1,2,4 };
-
-int warrHP[5] = { 0 };
 int n;
-int t = 0;
+int warrHP[5] = { 0 }; //初始生命
+int force[5] = { 0 }; //攻击力
+int T;
+int t = 0,h = 0;//计时
+int K; //lion忠诚度下降速度
+int N; //城市数
 class Headquarter;
 class Game;
-class weapon
+
+//类的定义
+class weapon   //武器基类
 {
 protected:
 
-	int durability;
+	double durability;
+	double force;
 public:	
-	int type;
+	int type;  //武器种类
 	weapon(int num)
 	{
 		type = num;
 	}
+//	virtual void attack();
 };
 
-class Warrior
+class Warrior  //武士基类
 {
 protected:
-	int type; //0 dragon 、1 ninja、2 iceman、3 lion、4 wolf 
+
+	bool marched;
 	int HP;
-	int number; //编号
-	int place;
+	int place;  
+	int weapInHand;
+	int weapNum;
+	weapon* weap[10];
 	Headquarter* camp;
-public:
-	Warrior(int Type, Headquarter* base , int num , int hp)
-	{
-		number = num;
-		camp = base;
-		HP = hp;
-		type = Type;
-	}
+public:	
+	bool alive;
+	int number; //编号
+	int color;
+	int type; //0 dragon 、1 ninja、2 iceman、3 lion、4 wolf 
+	void grabWeap();
+	void sortWeap();
+	Warrior(int Type, Headquarter* base, int num, int hp);
 };
 class dragon:public Warrior
 {
 	double morale;
-	weapon* weap;
 public:
 	dragon(int Type, Headquarter* base, int num, int hp ,int baseHP) :Warrior(Type, base, num, hp)
 	{
 		morale = (double)baseHP / hp;
-		weap = new weapon(num % 3);
-		cout <<setprecision(2)<<fixed<< "It has a " << weaponName[weap->type] << ",and it's morale is " << morale << endl;
+		weap[0] = new weapon(num % 3);
+		cout <<setprecision(2)<<fixed<< "It has a " << weaponName[weap[0]->type] << ",and it's morale is " << morale << endl;
 	}
 };
 class ninja:public Warrior
 {
-	weapon* weap[2];
 public:
 	ninja(int Type, Headquarter* base, int num, int hp) :Warrior(Type, base, num, hp)
 	{
@@ -88,16 +96,47 @@ public:
 };
 class iceman:public Warrior
 {
-	weapon* weap;
 public:
 	iceman(int Type, Headquarter* base, int num, int hp):Warrior(Type, base, num, hp)
 	{
-		weap = new weapon(num % 3);
-		cout << "It has a " <<  weaponName[weap->type]<< endl;
+		weap[0] = new weapon(num % 3);
+		cout << "It has a " <<  weaponName[weap[0]->type]<< endl;
 	}
 };
-class Headquarter
+
+class City
 {
+public:
+	int number;
+	int warrNum;
+	Warrior* warriors[2];
+	City(int n) :number(n) 
+	{
+		warriors[0] = 0;
+		warriors[1] = 0;
+	};
+	void fight();
+	void gotIn(Warrior* warr);
+	void scareLion();
+	void grab();
+	void yell();
+	void report();
+};
+void City::scareLion()
+{
+	for(int i = 0 ; i < 2 ; i ++)
+		if (warriors[i]!=0 && warriors[i]->type == 3)
+		{
+
+			cout << setw(3) << setfill('0') << t / 60 << ':' << setw(2) << setfill('0') << t % 60;
+			printf(" %s lion %d ran away", co[warriors[i]->color].c_str(),warriors[i]->number); 
+			warriors[i]->alive = false;
+			warriors[i] = 0;
+		}
+}
+class Headquarter //基地
+{
+	friend Warrior;
 	friend dragon;
 	friend iceman;
 	friend ninja;
@@ -109,15 +148,43 @@ private:
 	int warrNum[5];//dragon 、ninja、iceman、lion、wolf
 	int currHP; //剩余生命元
 	int currtype;
-
 	Warrior* warriors[1000];
 public:	
-	bool isExhausted;
+	bool occupied;
+	void updateQueue();
+	void march();
+	bool exhausted;
 	Headquarter(int color, int M);
-	bool exhaust();
 	void produce();
+	void broadcast();
 };
 
+
+class Game //游戏大类
+{
+	friend Headquarter;
+private:
+	int headHP;
+	int round;
+public:
+	City* citys[100];
+	void play();
+	Game(int num);
+};
+
+//各种类函数的定义
+
+Warrior::Warrior(int Type, Headquarter* base, int num, int hp)
+{
+	camp = base;
+	color = base->campColor;
+	marched = false;
+	weapNum = 0;
+	place = 0;
+	number = num;
+	HP = hp;
+	type = Type;
+}
 Headquarter::Headquarter(int M, int color)
 {
 	for (int i = 0; i < 5; i++)
@@ -125,43 +192,28 @@ Headquarter::Headquarter(int M, int color)
 		produceOrder[i] = order[color][i];
 		warrNum[i] = 0;
 	}
-	isExhausted = false;
+//	isExhausted = false;
 	currHP = M;
 	campColor = color;
 	totalwarr = 0;
 	currtype = 0;
+	occupied = false;
 }
-bool Headquarter::exhaust()
-{
-	for (int i = 0; i < 5; i++)
-	{
-		if (warrHP[i] <= currHP) return false;
-	}
-	return true;
-}
+
 void Headquarter::produce()
 {
-	if (exhaust() == true)
+	if (exhausted == true) return;
+	int type = produceOrder[currtype];	
+	if (warrHP[type] > currHP)
 	{
-		if (isExhausted == false)
-		{
-			cout << setw(3) << setfill('0') << t;
-			cout << ' ' << co[campColor] << " headquarter stops making warriors" << endl;
-			isExhausted = true;
-		}
+		exhausted = true;
 		return;
 	}
-	while (warrHP[produceOrder[currtype]] > currHP)
-	{
-		currtype = (currtype + 1) % 5;	//cout << ' ' << currHP <<' '<< endl;
-	}
-	cout << setw(3) << setfill('0') << t;
-	int type = produceOrder[currtype];
+	cout << setw(3) << setfill('0') << t / 60 << ':' << setw(2) << setfill('0') << t % 60;
 	currHP -= warrHP[type];
 	warrNum[type]++;
 	totalwarr++;	
-	cout << ' ' << co[campColor] << ' ' << warrName[type] << ' ' << totalwarr << " born with strength " << warrHP[type] 
-		<< ','<< warrNum[type] << ' ' << warrName[type] << " in " << co[campColor] << " headquarter" << endl;
+	cout << ' ' << co[campColor] << ' ' << warrName[type] << ' ' << totalwarr << " born" << endl;
 	switch (type)
 	{
 	case 0:	warriors[totalwarr] = new dragon(type,this,totalwarr,warrHP[type] , currHP); break;
@@ -174,38 +226,72 @@ void Headquarter::produce()
 	currtype++; currtype %= 5;
 }
 
-class Game
-{
-	friend Headquarter;
-private:
-	int headHP;
-	int round;
-public:
-	void play();
-	Game(int num);
-};
 Game::Game(int num)
 {
 	round = num;
-	cin >> headHP;
+	cin >> headHP >> N >> K >> T;
 	for (int j = 0; j < 5; j++)
-	{
 		cin >> warrHP[j];
-	}
+	for (int j = 0; j < 5; j++)
+		cin >> force[j];
+	for (int i = 1; i <= N; i++)
+		citys[i] = new City(i);
 	t = 0;
 }
 void Game::play()
-{
+{		
 	cout << "Case:" << round << endl;
-	t = 0;
 	Headquarter redBase(headHP,0), blueBase(headHP,1);
-	while (redBase.isExhausted != true || blueBase.isExhausted != true)
+	while (t <= T && true) 
 	{
-		redBase.produce();
-		blueBase.produce();
-		t++;
+		switch (t % 60)
+		{
+		case 0:
+		{
+			redBase.produce();
+			blueBase.produce();
+			break;
+		}
+		case 5:
+		{
+			for (int i = 1; i <= N; i++) citys[i]->scareLion();
+			break;
+		}
+		case 10:
+		{
+			redBase.march();
+			blueBase.march();
+		}
+		case 35:
+		{
+			for (int i = 1; i <= N; i++) citys[i]->grab();
+			break;
+		}
+		case 40:
+		{
+			for (int i = 1; i <= N; i++) citys[i]->fight();
+			for (int i = 1; i <= N; i++) citys[i]->yell();
+			break;
+		}
+		case 50:
+		{
+			redBase.broadcast();
+			blueBase.broadcast();
+			break;
+		}
+		case 55:
+		{
+			for (int i = 1; i <= N; i++) citys[i]->report();
+			break;
+		}
+		default:
+			break;
+		}
+		t += 5;
 	}
+
 }
+
 int main()
 {
 	cin >> n;
