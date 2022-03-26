@@ -107,8 +107,8 @@ public:
 };
 class lion:public Warrior
 {
-	int loyalty;
 public:
+	int loyalty;
 	lion(int Type, Headquarter* base, int num, int hp , int baseHP) :Warrior(Type, base, num, hp)
 	{
 		loyalty = baseHP;
@@ -230,7 +230,8 @@ void City::scareLion()
 	for(int i = 0 ; i < 2 ; i ++)
 		if (warriors[i]!=0 && warriors[i]->type == 3)
 		{
-
+			lion* li = (lion*)warriors[i];
+			if (li->loyalty > 0) continue;
 			giveTime();
 			printf("%s lion %d ran away", co[warriors[i]->color].c_str(),warriors[i]->number); 
 			warriors[i]->alive = false;
@@ -251,6 +252,7 @@ Warrior::Warrior(int Type, Headquarter* base, int num, int hp)
 	HP = hp;
 	type = Type;
 	force = warrForce[type];
+	alive = true;
 }
 Headquarter::Headquarter(int M, int color)
 {
@@ -272,12 +274,16 @@ void Headquarter::updateQueue()
 	aliveNum = 0;
 	for (int i = 1; i <= totalwarr; i++)
 	{
-		if (warriors[i]->alive == true)
+		if (warriors[i]!=0 && warriors[i]->alive == true)
 		{
 			aliveNum++;
 			warriors[aliveNum] = warriors[i];
 		}
-		else delete warriors[i];
+		else
+		{
+			delete warriors[i];
+			warriors[i] = 0;
+		}
 	}
 	for (int i = aliveNum + 1; i <= totalwarr; i++) warriors[i] = 0;
 }
@@ -329,6 +335,11 @@ Game::Game(int num)
 }
 void Game::enterCity(Headquarter& redBase, Headquarter& blueBase)
 {
+	for (int i = 1; i <= N; i++)
+	{
+		citys[i]->warriors[0] = 0;
+		citys[i]->warriors[1] = 0;
+	}
 	for (int i = 1; i <= blueBase.aliveNum; i++)
 	{
 		int pla = blueBase.warriors[i]->place;
@@ -357,8 +368,8 @@ void Game::outputAfterMarch(Headquarter& redBase, Headquarter& blueBase) //∫Ï∑Ωª
 	if (win[1] == true)
 	{
 		giveTime();
-		cout << "blue " << blueBase.warriors[0]->number << " reached red headquarter with " 
-			<< blueBase.warriors[0]->HP << " elements and force " << blueBase.warriors[0]->force << endl;
+		cout << "blue " << blueBase.warriors[1]->number << " reached red headquarter with " 
+			<< blueBase.warriors[1]->HP << " elements and force " << blueBase.warriors[1]->force << endl;
 		//red iceman 1 reached blue headquarter with 20 elements and force 30
 	}
 	for (int i = 1; i <= N; i++)
@@ -379,15 +390,15 @@ void Game::outputAfterMarch(Headquarter& redBase, Headquarter& blueBase) //∫Ï∑Ωª
 	if (win[0] == true)
 	{
 		giveTime();
-		cout << "red " << redBase.warriors[0]->number << " reached blue headquarter with "
-			<< redBase.warriors[0]->HP << " elements and force " << redBase.warriors[0]->force << endl;
+		cout << "red " << redBase.warriors[1]->number << " reached blue headquarter with "
+			<< redBase.warriors[1]->HP << " elements and force " << redBase.warriors[1]->force << endl;
 	}
 }
 void Game::play()
 {		
 	cout << "Case:" << round << endl;
 	Headquarter redBase(headHP,0), blueBase(headHP,1);
-	while (t <= T && true) 
+	while (t <= T && !win[0]&&!win[1]) 
 	{
 		switch (t % 60)
 		{
@@ -400,7 +411,7 @@ void Game::play()
 		case 5:
 		{
 			for (int i = 1; i <= N; i++) citys[i]->scareLion();
-			redBase.updateQueue(); blueBase.updateQueue();
+			redBase.updateQueue();blueBase.updateQueue();
 			break;
 		}
 		case 10:
@@ -410,6 +421,7 @@ void Game::play()
 			//ªπ–Ë¥¶¿ÌÃÿ ‚ŒÔ÷÷updateQueue
 			enterCity(redBase , blueBase);
 			outputAfterMarch(redBase, blueBase);
+			if (win[0] || win[1]) continue;
 			break;
 		}
 		//case 35:
