@@ -450,6 +450,7 @@ Headquarter::Headquarter(int M, int color)
 		produceOrder[i] = order[color][i];
 		warrNum[i] = 0;
 	}
+	exhausted = false;
 	currHP = M;
 	campColor = color;
 	aliveNum = 0;
@@ -459,7 +460,7 @@ Headquarter::Headquarter(int M, int color)
 }
 void Headquarter::updateQueue()
 {
-	aliveNum = 0; 
+	aliveNum = 0;
 	for (int i = 1; i <= totalwarr; i++)
 	{
 		if (warriors[i]!=0 && warriors[i]->alive == true)
