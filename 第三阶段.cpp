@@ -254,27 +254,7 @@ void City::scareLion()
 			warriors[i] = 0;
 		}
 }
-void Warrior::sortWeap()
-{
-	int tempWeap = 0; weapNum[0] = weapNum[1] = weapNum[2] = 0;
-	for (int i = 0; i < totalWeap; i++)
-		if (weap[i] != 0 && weap[i]->durability > 0)
-		{
-			weap[tempWeap++] = weap[i];
-			weapNum[weap[i]->type] ++;
-			if (tempWeap != i+1) weap[i] = 0;
-		}
-		else if (weap[i] != 0) delete weap[i];
-	for (int i = 1; i < tempWeap; i++)
-		for (int j = tempWeap - 1; j >= i; j--)
-			if (weap[j]->type < weap[j - 1]->type || (weap[j]->type == weap[j - 1]->type && weap[j]->durability < weap[j - 1]->durability))
-			{
-				Weapon* p = weap[j];
-				weap[j] = weap[j - 1];
-				weap[j - 1] = p;
-			}
-	totalWeap = tempWeap;
-}
+
 void City::grab() //wolf«¿∂·000:35 blue wolf 2 took 3 bomb from red dragon 2 in city 4
 {
 	if (warriors[0] == 0 || warriors[1] == 0)return;
