@@ -58,6 +58,7 @@ protected:
 	int totalWeap;
 	Headquarter* camp;
 public:
+	bool inHead;
 	int force;
 	int HP;
 	bool alive;
@@ -78,7 +79,7 @@ public:
 	{
 		morale = (double)baseHP / hp;
 		initWeap(num % 3);
-		cout <<setprecision(2)<<fixed << "It's morale is " << morale << endl;
+		cout <<setprecision(2)<<fixed << "Its morale is " << morale << endl;
 	}
 };
 class ninja :public Warrior
@@ -115,6 +116,7 @@ class iceman :public Warrior
 public:
 	iceman(int Type, Headquarter* base, int num, int hp) :Warrior(Type, base, num, hp)
 	{
+		countStep = 0;
 		initWeap(num % 3);
 	}
 	void marchOn()
@@ -155,6 +157,7 @@ public:
 	void grab();
 	void air();
 	void report();
+	void airFight();
 	void headGainHP();
 	void bombAttack();
 	void getAward(Headquarter* head);
@@ -205,7 +208,7 @@ public:
 	void outputAfterMarch(Headquarter& redBase, Headquarter& blueBase);
 	void play();
 	void shoot();
-	void afterFight(Headquarter* redBase, Headquarter* blueBase);
+	void wholeFight(Headquarter* redBase, Headquarter* blueBase);
 	Game(int num);
 };
 
@@ -225,6 +228,7 @@ sword::sword(int num, Warrior* warr)
 void sword::strike(Warrior* owner, Warrior* enemy)
 {
 	enemy->HP -= force;
+	if (enemy->HP <= 0) enemy->alive = false;
 	force = force * 8 / 10;
 }
 void bomb::strike(Warrior* owner, Warrior* enemy)
@@ -232,7 +236,7 @@ void bomb::strike(Warrior* owner, Warrior* enemy)
 	enemy->alive = false;
 	owner->alive = false;
 	durability = 0;
-	giveTime();
+	cout << setw(3) << setfill('0') << t / 60 << ':' << 38 << ' ';
 	printf("%s %s %d used a bomb and killed %s %s %d\n", co[owner->color].c_str(), warrName[owner->type].c_str(), owner->number,
 		co[enemy->color].c_str(), warrName[enemy->type].c_str(), enemy->number);
 }
@@ -322,35 +326,49 @@ void City::gotIn(Warrior* warr)
 }
 void City::fight()//Êä³ö½ø¹¥·´»÷ÓëÕ½ËÀ£¨±»¼ýÉäËÀ²»Ëã£©
 {
-	Warrior* fr = warriors[flag];
+	Warrior* fr = warriors[flag]; 
 	Warrior* fe = warriors[1 - flag];
-	if (fe == 0 || fr == 0 || !fr->alive || !fe->alive) return;
+	if (fe == 0 || fr == 0 || !fr->alive || !fe->alive) return; 
 	if(fr->ws != 0 ) fr->ws->strike(fr, fe);
+	if (fr->ws != 0 && fr->ws->force == 0) fr->ws = 0;
 	fe->HP -= fr->force;
 	giveTime();
 	printf("%s %s %d attacked %s %s %d in city %d with %d elements and force %d\n", co[fr->color].c_str(), warrName[fr->type].c_str(), fr->number,
 		co[fe->color].c_str(), warrName[fe->type].c_str(), fe->number, number, fr->HP, fr->force);
 	if (fe->HP <= 0)
 	{
+		fe->alive = false;
+		if (fe->type == 3)
+		{
+			lion* li = (lion*)fe;
+			fr->HP += li->lastHP;
+		}
 		giveTime();
 		printf("%s %s %d was killed in city %d\n", co[fe->color].c_str(), warrName[fe->type].c_str(), fe->number, number);
+		return;
 	}
 	if (fe->type == 1) return;
 	if (fe->ws != 0) fe->ws->strike(fe, fr);
+	if (fe->ws != 0 && fe->ws->force == 0) fe->ws = 0;
 	fr->HP -= (fe->force / 2);
 	giveTime();
 	printf("%s %s %d fought back against %s %s %d in city %d\n", co[fe->color].c_str(), warrName[fe->type].c_str(), fe->number,
 		co[fr->color].c_str(), warrName[fr->type].c_str(), fr->number, number);
 	if (fr->HP <= 0)
 	{
+		if (fr->type == 3)
+		{
+			lion* li = (lion*)fr;
+			fe->HP += li->lastHP;
+		}
+		fr->alive = false;
 		giveTime();
 		printf("%s %s %d was killed in city %d\n", co[fr->color].c_str(), warrName[fr->type].c_str(), fr->number, number);
 	}
-	
 }
 void City::headGainHP()
 {
-	if (preWarrNum == 1)
+	if (preWarrNum == 1 && HP > 0)
 	{
 		Warrior* warr = warriors[0] == 0 ? warriors[1] : warriors[0];
 		giveTime();
@@ -358,33 +376,36 @@ void City::headGainHP()
 		warr->camp->currHP += HP;
 		HP = 0;
 	}
+	else if (warriors[0] != 0 && warriors[1] != 0 && warriors[0]->alive + warriors[1]->alive == 1 && HP > 0)
+	{
+		Warrior* warr = warriors[0]->alive ? warriors[0] : warriors[1];
+		giveTime();
+		printf("%s %s %d earned %d elements for his headquarter\n", co[warr->color].c_str(), warrName[warr->type].c_str(), warr->number, HP);
+		warr->camp->currHP += HP;
+		HP = 0;
+	}
+
 }
 void City::bombAttack()
 {
 	Warrior* fr = warriors[flag];
 	Warrior* fe = warriors[1 - flag];
 	if (fe == 0 || fr == 0 || !fr->alive || !fe->alive) return;
-	if (fr->ws != 0) fr->ws->strike(fr, fe);
-	fe->HP -= fr->force;
-	if (fe->HP <= 0)
+	int virtualHP = fe->HP;
+	if(fr->ws != 0) virtualHP -= fr->ws->force;
+	virtualHP -= fr->force; 
+	if (virtualHP <= 0 && fe->wb != 0)
 	{
-		if (fe->wb != 0)
-		{
-			fe->alive = false; fe->HP = 0;
-			fr->alive = false; fr->HP = 0;
-		}
+		fe->wb->strike(fe, fr);
 		return;
 	}
 	if (fe->type == 1) return;
-	if (fe->ws != 0) fe->ws->strike(fe, fr);
-	fr->HP -= (fe->force / 2);
-	if (fr->HP <= 0)
+	virtualHP = fr->HP;
+	if(fe->ws != 0) virtualHP -= fe->ws->force;
+	virtualHP -= (fe->force / 2);
+	if (virtualHP <= 0 && fr->wb != 0)
 	{
-		if (fr->wb != 0)
-		{
-			fe->alive = false; fe->HP = 0;
-			fr->alive = false; fr->HP = 0;
-		}
+		fr->wb->strike(fr, fe);
 		return;
 	}
 }
@@ -417,7 +438,11 @@ void City::dragonYell()
 		dragon* dra = (dragon*)warriors[1];
 		if (!warriors[0]->alive) dra->morale -= 0.2;
 		else dra->morale += 0.2;
-		if (flag == 1 && dra->morale > 0.8) printf("%s %s %d yelled in city %d\n", co[dra->color].c_str(), warrName[dra->type].c_str(), dra->number, number);
+		if (flag == 1 && dra->morale > 0.8)
+		{
+			giveTime();
+			printf("%s %s %d yelled in city %d\n", co[dra->color].c_str(), warrName[dra->type].c_str(), dra->number, number);
+		}
 	}
 }
 void City::lionFear()
@@ -453,27 +478,28 @@ void City::changeFlag()
 	if (warriors[0]->alive + warriors[1]->alive != 1) warRecord = 0;
 	else if (warriors[0]->alive)
 	{
-		if (warRecord > 0) warRecord = -1;
+		if (warRecord >= 0) warRecord = -1;
 		else warRecord -= 1;
 	}
 	else
 	{
-		if (warRecord < 0) warRecord = 1;
+		if (warRecord <= 0) warRecord = 1;
 		else warRecord += 1;
 	}
-	if (warRecord >= 2)
+	if (warRecord == 2)
 	{
 		flag = 1;
 		giveTime();
 		printf("blue flag raised in city %d\n", number);
 	}
-	else
+	else if (warRecord == -2)
 	{
 		flag = 0;
 		giveTime();
 		printf("red flag raised in city %d\n", number);
 	}
 }
+
 void Game::shoot()
 {
 	for (int i = 1; i <= N; i++)
@@ -483,21 +509,30 @@ void Game::shoot()
 		{
 			if (i != 1 && citys[i - 1]->warriors[1] != 0)
 				fromCity->warriors[0]->wa->strike(fromCity->warriors[0],citys[i - 1]->warriors[1]);
-			if(i != N && citys[i + 1]->warriors[1] != 0)
+			if (fromCity->warriors[0]->wa->durability == 0) fromCity->warriors[0]->wa = 0;
+			if (fromCity->warriors[0]->wa != 0 && i != N && citys[i + 1]->warriors[1] != 0)
+			{
 				fromCity->warriors[0]->wa->strike(fromCity->warriors[0], citys[i + 1]->warriors[1]);
+				if (fromCity->warriors[0]->wa->durability == 0) fromCity->warriors[0]->wa = 0;
+			}
 		}
 		else if (fromCity->warriors[1] != 0 && fromCity->warriors[1]->wa != 0)
 		{
 			if (i != 1 && citys[i - 1]->warriors[0] != 0)
 				fromCity->warriors[1]->wa->strike(fromCity->warriors[1], citys[i - 1]->warriors[0]);
-			if (i != N && citys[i + 1]->warriors[0] != 0)
+			if (fromCity->warriors[1]->wa->durability == 0) fromCity->warriors[1]->wa = 0;
+			if (fromCity->warriors[1]->wa != 0 && i != N && citys[i + 1]->warriors[0] != 0)
+			{
 				fromCity->warriors[1]->wa->strike(fromCity->warriors[1], citys[i - 1]->warriors[0]);
+				if (fromCity->warriors[1]->wa->durability == 0) fromCity->warriors[1]->wa = 0;
+			}
 		}
 	}
 
 }
 Warrior::Warrior(int Type, Headquarter* base, int num, int hp)
 {
+	inHead = false;
 	wa = 0; ws = 0; wb = 0;
 	camp = base;
 	color = base->campColor;
@@ -532,13 +567,13 @@ void Headquarter::updateQueue()
 			aliveNum++;
 			warriors[aliveNum] = warriors[i];
 		}
-		else
+		else if(warriors[i] != 0)
 		{
-			delete warriors[i];
+			//delete warriors[i];
 			warriors[i] = 0;
 		}
 	}
-	for (int i = aliveNum + 1; i <= totalwarr; i++) warriors[i] = 0;
+	for (int i = aliveNum + 1; i <= totalwarr; i++) warriors[i] = 0; 
 }
 void Headquarter::march()
 {
@@ -550,10 +585,11 @@ void Headquarter::march()
 }
 void Headquarter::recordHP()
 {
-	for (int i = 1; i <= totalwarr; i++)
+	for (int i = 1; i <= aliveNum; i++)
 	{
 		if (warriors[i]->type != 3) return;		
 		lion* li = (lion*)warriors[i];
+		if (li->HP < 0) li->HP = 0;
 		li->lastHP = li->HP;
 	}
 }
@@ -580,9 +616,9 @@ void Headquarter::produce()
 
 void Headquarter::report()
 {
-	for (int i = 1; i <= aliveNum; i++)
+	for (int j = 1; j <= aliveNum; j++)
 	{
-		if (campColor == 1) i = aliveNum - i + 1;
+		int i = campColor==1 ? j:aliveNum - j + 1;
 		giveTime();
 		printf("%s %s %d has ", co[campColor].c_str(), warrName[warriors[i]->type].c_str(), warriors[i]->number);
 		int weapnum = 0; Warrior* warr = warriors[i];
@@ -650,10 +686,10 @@ void Game::outputAfterMarch(Headquarter& redBase, Headquarter& blueBase) //ºì·½»
 	if (win[1] == 1 && (blueBase.aliveNum > 1 && blueBase.warriors[2]->place == 0)|| 
 		win[1] == 0 && (blueBase.aliveNum > 0 && blueBase.warriors[1]->place == 0))
 	{
+		Warrior* warr = blueBase.warriors[win[1] + 1];
 		giveTime();
-		cout << "blue " << warrName[blueBase.warriors[1]->type] << ' ' << blueBase.warriors[1]->number << " reached red headquarter with "
-			<< blueBase.warriors[1]->HP << " elements and force " << blueBase.warriors[1]->force << endl;
-		
+		cout << "blue " << warrName[warr->type] << ' ' << warr->number << " reached red headquarter with "
+			<< warr->HP << " elements and force " << warr->force << endl;	
 		win[1] ++;
 		if (win[1] == 2)
 		{
@@ -680,9 +716,10 @@ void Game::outputAfterMarch(Headquarter& redBase, Headquarter& blueBase) //ºì·½»
 	if (win[0] == 1 && (redBase.aliveNum > 1 && redBase.warriors[2]->place == N+1) 
 		|| win[0] == 0 && (redBase.aliveNum > 0 && redBase.warriors[1]->place == N+1))
 	{
+		Warrior* warr = redBase.warriors[win[0] + 1];
 		giveTime();
-		cout << "red " << warrName[redBase.warriors[1]->type] << ' ' << redBase.warriors[1]->number << " reached blue headquarter with "
-			<< redBase.warriors[1]->HP << " elements and force " << redBase.warriors[1]->force << endl;
+		cout << "red " << warrName[warr->type] << ' ' << warr->number << " reached blue headquarter with "
+			<< warr->HP << " elements and force " << warr->force << endl;
 		win[0] ++;
 		if (win[0] == 2)
 		{
@@ -691,15 +728,19 @@ void Game::outputAfterMarch(Headquarter& redBase, Headquarter& blueBase) //ºì·½»
 		}
 	}
 }
-void Game::afterFight(Headquarter* redBase , Headquarter* blueBase)
+void Game::wholeFight(Headquarter* redBase , Headquarter* blueBase)
 {
-	for (int i = 1; i <= N; i++) citys[i]->grab();
-	for (int i = 1; i <= N; i++) citys[i]->dragonYell();
-	for (int i = 1; i <= N; i++) citys[i]->lionFear();
+	for (int i = 1; i <= N; i++)
+	{
+		citys[i]->fight();
+		citys[i]->grab();
+		citys[i]->dragonYell();
+		citys[i]->lionFear();
+		citys[i]->headGainHP();
+		citys[i]->changeFlag();
+	}
 	for (int i = 1; i <= N; i++) citys[i]->getAward(blueBase);
 	for (int i = N; i >= 1; i--) citys[i]->getAward(redBase);
-	for (int i = 1; i <= N; i++) citys[i]->headGainHP();
-	for (int i = 1; i <= N; i++) citys[i]->changeFlag();
 }
 void Game::play()
 {
@@ -745,9 +786,7 @@ void Game::play()
 		}
 		case 40:
 		{
-			for (int i = 1; i <= N; i++) citys[i]->fight();
-			afterFight(&redBase,&blueBase);
-			for (int i = 1; i <= N; i++) citys[i]->air();
+			wholeFight(&redBase,&blueBase);
 			break;
 		}
 		case 50:
@@ -757,8 +796,8 @@ void Game::play()
 			break;
 		}
 		case 55:
-		{
-			redBase.updateQueue(); blueBase.updateQueue();
+		{ 
+			redBase.updateQueue(); blueBase.updateQueue(); cout << "kk" << endl;
 			redBase.report(); blueBase.report();
 			break;
 		}
