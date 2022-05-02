@@ -145,7 +145,7 @@ public:
 	City(int n) :number(n)
 	{
 		warRecord = 0;
-		flag = (number + 1) % 2;
+		flag = (number + 1) % 2 + 2; 
 		preWarrNum = 0;
 		HP = 0;
 		warriors[0] = 0;
@@ -194,6 +194,7 @@ public:
 	void produce();
 	void broadcast();
 	void report();
+	void scareLion();
 };
 class Game //游戏大类
 {
@@ -242,7 +243,7 @@ void bomb::strike(Warrior* owner, Warrior* enemy)
 }
 void arrow::strike(Warrior* owner, Warrior* enemy)
 {
-	enemy->HP -= R;
+	enemy->HP -= R;  
 	if (enemy->HP <= 0) enemy->alive = false;
 	durability -= 1;
 	giveTime();
@@ -256,7 +257,7 @@ void City::scareLion()
 		if (warriors[i] != 0 && warriors[i]->type == 3)
 		{
 			lion* li = (lion*)warriors[i];
-		//	cout << li->loyalty << endl;
+			//cout << li->loyalty << endl;
 			if (li->loyalty > 0) continue;
 			giveTime();
 			printf("%s lion %d ran away\n", co[warriors[i]->color].c_str(), warriors[i]->number);
@@ -268,10 +269,10 @@ void City::scareLion()
 void City::grab() //wolf抢夺000:35 blue wolf 2 took 3 bomb from red dragon 2 in city 4
 {
 	if (warriors[0] == 0 || warriors[1] == 0)return;
-	if ((warriors[0]->type == 4) + (warriors[1]->type == 4) != 1) return;
-	int lang = 0;
-	if (warriors[1]->type == 4) lang = 1; int bei = 1 - lang;
-	if (warriors[bei]->alive == true) return;
+	if ((warriors[0]->alive + warriors[1]->alive) != 1) return;
+	int lang(warriors[0]->alive ? 0 : 1); 
+	int bei = 1 - lang;
+	if (warriors[lang]->type != 4) return;
 	if (warriors[lang]->wa == 0 && warriors[bei]->wa != 0) warriors[lang]->wa = warriors[bei]->wa;
 	if (warriors[lang]->wb == 0 && warriors[bei]->wb != 0) warriors[lang]->wb = warriors[bei]->wb;
 	if (warriors[lang]->ws == 0 && warriors[bei]->ws != 0) warriors[lang]->ws = warriors[bei]->ws;
@@ -310,7 +311,11 @@ void Warrior::initWeap(int num)
 {
 	switch (num % 3)
 	{
-	case 0:ws = new sword(num % 3, this); break;
+	case 0:
+	{
+		if (force / 5 >= 1) ws = new sword(num % 3, this);
+		break;
+	}
 	case 1:wb = new bomb(num % 3, this); break;
 	case 2:wa = new arrow(num % 3, this); break;
 	default:
@@ -326,8 +331,8 @@ void City::gotIn(Warrior* warr)
 }
 void City::fight()//输出进攻反击与战死（被箭射死不算）
 {
-	Warrior* fr = warriors[flag]; 
-	Warrior* fe = warriors[1 - flag];
+	Warrior* fr = warriors[flag % 2]; 
+	Warrior* fe = warriors[1 - flag % 2];
 	if (fe == 0 || fr == 0 || !fr->alive || !fe->alive) return; 
 	if(fr->ws != 0 ) fr->ws->strike(fr, fe);
 	if (fr->ws != 0 && fr->ws->force == 0) fr->ws = 0;
@@ -388,15 +393,15 @@ void City::headGainHP()
 }
 void City::bombAttack()
 {
-	Warrior* fr = warriors[flag];
-	Warrior* fe = warriors[1 - flag];
+	Warrior* fr = warriors[flag % 2];
+	Warrior* fe = warriors[1 - flag % 2]; 
 	if (fe == 0 || fr == 0 || !fr->alive || !fe->alive) return;
 	int virtualHP = fe->HP;
 	if(fr->ws != 0) virtualHP -= fr->ws->force;
 	virtualHP -= fr->force; 
-	if (virtualHP <= 0 && fe->wb != 0)
-	{
-		fe->wb->strike(fe, fr);
+	if (virtualHP <= 0)
+	{	
+		if(fe->wb != 0)	fe->wb->strike(fe, fr);
 		return;
 	}
 	if (fe->type == 1) return;
@@ -427,7 +432,7 @@ void City::dragonYell()
 		dragon* dra = (dragon*)warriors[0];
 		if (!warriors[1]->alive) dra->morale -= 0.2;
 		else dra->morale += 0.2;
-		if (flag == 0 && dra->morale > 0.8)
+		if (flag % 2 == 0 && dra->morale > 0.8)
 		{
 			giveTime();
 			printf("%s %s %d yelled in city %d\n", co[dra->color].c_str(), warrName[dra->type].c_str(), dra->number, number);
@@ -438,7 +443,7 @@ void City::dragonYell()
 		dragon* dra = (dragon*)warriors[1];
 		if (!warriors[0]->alive) dra->morale -= 0.2;
 		else dra->morale += 0.2;
-		if (flag == 1 && dra->morale > 0.8)
+		if (flag % 2 == 1 && dra->morale > 0.8)
 		{
 			giveTime();
 			printf("%s %s %d yelled in city %d\n", co[dra->color].c_str(), warrName[dra->type].c_str(), dra->number, number);
@@ -452,13 +457,13 @@ void City::lionFear()
 	{
 		lion* li = (lion*)warriors[0];
 		if (warriors[1]->alive) li->loyalty -= K;
-		if (!li->alive) warriors[1]->HP += li->lastHP;
+//		if (!li->alive) warriors[1]->HP += li->lastHP;
 	}
-	else if (warriors[0]->type == 3 && warriors[0]->type != 3)
+	else if (warriors[1]->type == 3 && warriors[0]->type != 3)
 	{
 		lion* li = (lion*)warriors[1];
-		if (warriors[1]->alive) li->loyalty -= K;
-		if (!li->alive) warriors[0]->HP += li->lastHP;       //判断生死用的是alive，故不会复生
+		if (warriors[0]->alive) li->loyalty -= K;
+//		if (!li->alive) warriors[0]->HP += li->lastHP;       //判断生死用的是alive，故不会复生
 	}
 	else
 	{
@@ -468,13 +473,13 @@ void City::lionFear()
 			li1->loyalty -= K;
 			li2->loyalty -= K;
 		}
-		else if (li1->alive) li2->HP += li1->lastHP;
-		else li2->HP += li1->lastHP;
+//		else if (li1->alive) li2->HP += li1->lastHP;
+//		else li2->HP += li1->lastHP;
 	}
 }
 void City::changeFlag()
 {
-	if (warriors[0] == 0 || warriors[1] == 0) return;
+	if (warriors[0] == 0 || warriors[1] == 0 || !warriors[0]->alive && !warriors[1]->alive) return;
 	if (warriors[0]->alive + warriors[1]->alive != 1) warRecord = 0;
 	else if (warriors[0]->alive)
 	{
@@ -486,13 +491,13 @@ void City::changeFlag()
 		if (warRecord <= 0) warRecord = 1;
 		else warRecord += 1;
 	}
-	if (warRecord == 2)
+	if (warRecord == 2 && flag != 1)
 	{
 		flag = 1;
 		giveTime();
 		printf("blue flag raised in city %d\n", number);
 	}
-	else if (warRecord == -2)
+	else if (warRecord == -2 && flag != 0)
 	{
 		flag = 0;
 		giveTime();
@@ -507,25 +512,25 @@ void Game::shoot()
 		City* fromCity = citys[i];
 		if (fromCity->warriors[0] != 0 && fromCity->warriors[0]->wa != 0)
 		{
-			if (i != 1 && citys[i - 1]->warriors[1] != 0)
-				fromCity->warriors[0]->wa->strike(fromCity->warriors[0],citys[i - 1]->warriors[1]);
+			if (i != N && citys[i + 1]->warriors[1] != 0)
+				fromCity->warriors[0]->wa->strike(fromCity->warriors[0],citys[i + 1]->warriors[1]);
 			if (fromCity->warriors[0]->wa->durability == 0) fromCity->warriors[0]->wa = 0;
-			if (fromCity->warriors[0]->wa != 0 && i != N && citys[i + 1]->warriors[1] != 0)
-			{
-				fromCity->warriors[0]->wa->strike(fromCity->warriors[0], citys[i + 1]->warriors[1]);
-				if (fromCity->warriors[0]->wa->durability == 0) fromCity->warriors[0]->wa = 0;
-			}
+			//if (fromCity->warriors[0]->wa != 0 && i != N && citys[i + 1]->warriors[1] != 0)
+			//{
+			//	fromCity->warriors[0]->wa->strike(fromCity->warriors[0], citys[i + 1]->warriors[1]);
+			//	if (fromCity->warriors[0]->wa->durability == 0) fromCity->warriors[0]->wa = 0;
+			//}
 		}
-		else if (fromCity->warriors[1] != 0 && fromCity->warriors[1]->wa != 0)
-		{
+		if (fromCity->warriors[1] != 0 && fromCity->warriors[1]->wa != 0)
+		{		
 			if (i != 1 && citys[i - 1]->warriors[0] != 0)
 				fromCity->warriors[1]->wa->strike(fromCity->warriors[1], citys[i - 1]->warriors[0]);
 			if (fromCity->warriors[1]->wa->durability == 0) fromCity->warriors[1]->wa = 0;
-			if (fromCity->warriors[1]->wa != 0 && i != N && citys[i + 1]->warriors[0] != 0)
-			{
-				fromCity->warriors[1]->wa->strike(fromCity->warriors[1], citys[i - 1]->warriors[0]);
-				if (fromCity->warriors[1]->wa->durability == 0) fromCity->warriors[1]->wa = 0;
-			}
+			//if (fromCity->warriors[1]->wa != 0 && i != N && citys[i + 1]->warriors[0] != 0)
+			//{
+			//	fromCity->warriors[1]->wa->strike(fromCity->warriors[1], citys[i + 1]->warriors[0]);
+			//	if (fromCity->warriors[1]->wa->durability == 0) fromCity->warriors[1]->wa = 0;
+			//}
 		}
 	}
 
@@ -579,18 +584,18 @@ void Headquarter::march()
 {
 	for (int i = 1; i <= totalwarr && warriors[i] != 0; i++)
 	{
-		if (warriors[i]->place == 0 &&  campColor == 1 || warriors[i]->place == N+1 && campColor == 0) continue;
+		if (warriors[i]->place == 0 && campColor == 1 || warriors[i]->place == N + 1 && campColor == 0) continue;
 		warriors[i]->marchOn();
 	}
 }
 void Headquarter::recordHP()
 {
-	for (int i = 1; i <= aliveNum; i++)
-	{
-		if (warriors[i]->type != 3) return;		
+	for (int i = 1; i <= totalwarr; i++)
+	{ 
+		if (warriors[i] == 0 || warriors[i]->type != 3) continue;		
 		lion* li = (lion*)warriors[i];
 		if (li->HP < 0) li->HP = 0;
-		li->lastHP = li->HP;
+		li->lastHP = li->HP; 
 	}
 }
 void Headquarter::produce()       
@@ -612,6 +617,21 @@ void Headquarter::produce()
 	case 4: warriors[totalwarr] = new wolf(type, this, totalwarr, warrHP[type]); break;
 	}
 
+}
+
+void Headquarter::scareLion()
+{
+	if (totalwarr == 0) return;
+	if(warriors[totalwarr]!= 0 && warriors[totalwarr]->type == 3)
+	{
+		lion* li = (lion*)warriors[totalwarr];
+		//cout << li->loyalty << endl;
+		if (li->loyalty > 0) return;
+		giveTime();
+		printf("%s lion %d ran away\n", co[campColor].c_str(), totalwarr);
+		li->alive = false;
+		warriors[totalwarr] = 0; aliveNum--;
+	}
 }
 
 void Headquarter::report()
@@ -748,6 +768,7 @@ void Game::play()
 	Headquarter redBase(headHP, 0), blueBase(headHP, 1);
 	while (t <= T && win[0] < 2 && win[1] < 2)
 	{
+		
 		switch (t % 60)
 		{
 		case 0:
@@ -758,7 +779,9 @@ void Game::play()
 		}
 		case 5:
 		{
+			redBase.scareLion();
 			for (int i = 1; i <= N; i++) citys[i]->scareLion();
+			blueBase.scareLion();
 			redBase.updateQueue(); blueBase.updateQueue();
 			break;
 		}
@@ -797,7 +820,7 @@ void Game::play()
 		}
 		case 55:
 		{ 
-			redBase.updateQueue(); blueBase.updateQueue(); cout << "kk" << endl;
+			redBase.updateQueue(); blueBase.updateQueue(); //cout << "kk" << endl;
 			redBase.report(); blueBase.report();
 			break;
 		}
